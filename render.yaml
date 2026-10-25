@@ -1,6 +1,6 @@
 # Render Blueprint — RateXI (React + Vite, served by a small Node server)
 # Deploy: push this repo to GitHub/GitLab, then on Render choose
-# "New + → Blueprint", point it at this repository and set Blueprint Path to RateXI/render.yaml.
+# "New + → Blueprint" and point it at this repository (Render reads render.yaml from the repo root).
 # server/index.js keeps EXCHANGERATE_API_KEY on the server; the browser only calls /api/latest/:base.
 # SPA fallback and long-cache for /assets/* are handled in server/index.js.
 services:

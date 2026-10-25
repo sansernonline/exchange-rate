@@ -47,9 +47,10 @@ RateXI/
 │  ├─ index.js           เซิร์ฟเวอร์สำหรับใช้จริง: เสิร์ฟ dist/ และส่งทุกหน้าที่ไม่เจอไปที่ index.html
 │  └─ latest-rates.js    GET /api/latest/:base — ส่งต่อไป ExchangeRate-API และจำผลไว้ 1 ชั่วโมง
 ├─ vite.config.js        พอร์ต 7100 และ /api ตอน dev
-├─ render.yaml           ตั้งค่า deploy บน Render
 └─ .env.example
 ```
+
+ข้อยกเว้น: `render.yaml` อยู่ที่ราก repo ไม่ใช่ใน `RateXI/` เพราะ Render อ่าน Blueprint จากราก repo
 
 ข้อมูลเดินทางแบบนี้:
 
@@ -69,7 +70,7 @@ RateXI/
 ## Deploy บน Render
 
 1. push repo นี้ขึ้น GitHub หรือ GitLab
-2. ใน Render เลือก **New + → Blueprint** แล้วชี้มาที่ repo นี้ ช่อง **Blueprint Path** ใส่ `RateXI/render.yaml` (ราก repo คือโฟลเดอร์แม่ของ `RateXI/` และ `render.yaml` ตั้ง `rootDir: RateXI` ไว้แล้ว · แผนฟรี, Node 22.12.0)
+2. ใน Render เลือก **New + → Blueprint** แล้วชี้มาที่ repo นี้ ช่อง **Blueprint Path** ปล่อยค่าเดิม `render.yaml` (ไฟล์อยู่ที่ราก repo และตั้ง `rootDir: RateXI` ไว้แล้ว · แผนฟรี, Node 22.12.0)
 3. Render จะถามค่า `EXCHANGERATE_API_KEY` ใส่หรือเว้นว่างก็ได้
 
 แผนฟรีของ Render หลับเมื่อไม่มีคนใช้ เปิดครั้งแรกหลังหลับจะช้าไม่กี่สิบวินาที
