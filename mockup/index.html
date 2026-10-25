@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="RateXI — แปลงสกุลเงินแบบเรียลไทม์ ดึงอัตราแลกเปลี่ยนจาก ExchangeRate-API" />
+<title>RateXI — Currency Converter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --emerald: #34d399; --teal: #2dd4bf; --violet: #a78bfa; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', 'Noto Sans Thai', system-ui, sans-serif;
+    background: #07090d; color: #fff; min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .glow { position: fixed; inset: 0; pointer-events: none; }
+  .glow::before {
+    content: ''; position: absolute; top: -160px; left: 50%; transform: translateX(-50%);
+    width: 720px; height: 480px; border-radius: 50%;
+    background: rgba(16,185,129,.13); filter: blur(140px);
+  }
+  .glow::after {
+    content: ''; position: absolute; right: -120px; top: 33%;
+    width: 360px; height: 360px; border-radius: 50%;
+    background: rgba(56,189,248,.09); filter: blur(120px);
+  }
+  .grid-bg {
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      linear-gradient(to right, rgba(255,255,255,.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black, transparent);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black, transparent);
+  }
+  .wrap { position: relative; max-width: 768px; margin: 0 auto; padding: 20px 20px 80px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #34d399, #0d9488); box-shadow: 0 8px 24px rgba(16,185,129,.25);
+  }
+  .logo-icon svg { width: 20px; height: 20px; stroke: #022c22; stroke-width: 2.5; }
+  .logo .accent { color: var(--emerald); }
+  .badge {
+    display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500;
+    border-radius: 999px; padding: 5px 12px; border: 1px solid;
+  }
+  .badge.live { border-color: rgba(52,211,153,.25); background: rgba(52,211,153,.1); color: #6ee7b7; }
+  .badge.offline { border-color: rgba(251,191,36,.25); background: rgba(251,191,36,.1); color: #fcd34d; }
+  .badge.hist { border-color: rgba(167,139,250,.25); background: rgba(167,139,250,.1); color: #c4b5fd; }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge.live .dot { animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+  .hero { text-align: center; margin-top: 28px; }
+  .hero .pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,.6);
+    border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+    border-radius: 999px; padding: 5px 12px; margin-bottom: 12px;
+  }
+  .hero .pill svg { width: 14px; height: 14px; stroke: var(--emerald); }
+  h1 { font-size: clamp(34px, 6vw, 48px); font-weight: 700; letter-spacing: -.02em; }
+  h1 .grad {
+    background: linear-gradient(90deg, #6ee7b7, #2dd4bf);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  .card {
+    margin-top: 24px; border-radius: 24px; padding: 28px;
+    border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.035);
+    backdrop-filter: blur(16px); box-shadow: 0 24px 60px rgba(0,0,0,.4);
+  }
+  @media (min-width: 640px) { .card { padding: 32px; } }
+
+  .warn {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 20px;
+    border: 1px solid rgba(251,191,36,.25); background: rgba(251,191,36,.1);
+    color: #fde68a; font-size: 12px; border-radius: 12px; padding: 10px 16px;
+  }
+  .warn svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .hidden { display: none !important; }
+
+  label { display: block; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: rgba(255,255,255,.45); margin-bottom: 8px; }
+  .amount-box {
+    display: flex; align-items: center; gap: 12px; border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); padding: 16px 20px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .amount-box:focus-within { border-color: rgba(52,211,153,.5); box-shadow: 0 0 0 3px rgba(52,211,153,.2); }
+  .amount-box .sym { font-size: 24px; font-weight: 600; color: rgba(255,255,255,.4); }
+  .amount-box input {
+    width: 100%; background: transparent; border: 0; outline: 0; color: #fff;
+    font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+    font-family: inherit;
+  }
+  .amount-box input::placeholder { color: rgba(255,255,255,.2); }
+  .amount-box .code { flex-shrink: 0; border-radius: 8px; background: rgba(255,255,255,.07); padding: 5px 10px; font-size: 14px; font-weight: 700; color: rgba(255,255,255,.7); }
+
+
+  .row { display: grid; gap: 12px; margin-top: 24px; align-items: end; }
+  @media (min-width: 640px) {
+    .row { grid-template-columns: 1fr auto 1fr; }
+    .row .swap { margin-bottom: 9px; } /* (select 62px - swap 44px) / 2 → centred on the select boxes */
+  }
+
+  .sel { position: relative; }
+  .sel-btn {
+    display: flex; align-items: center; gap: 12px; width: 100%; border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+    padding: 12px 16px; cursor: pointer; transition: all .15s; font-family: inherit; text-align: left;
+  }
+  .sel-btn:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.07); }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+  }
+  .avatar.emerald { background: rgba(52,211,153,.15); color: #6ee7b7; box-shadow: inset 0 0 0 1px rgba(52,211,153,.3); }
+  .avatar.sky { background: rgba(56,189,248,.15); color: #7dd3fc; box-shadow: inset 0 0 0 1px rgba(56,189,248,.3); }
+  .sel-btn .meta { flex: 1; min-width: 0; }
+  .sel-btn .meta b { display: block; font-size: 16px; color: #fff; }
+  .sel-btn .meta span { display: block; font-size: 12px; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sel-btn > svg { width: 16px; height: 16px; color: rgba(255,255,255,.4); flex-shrink: 0; }
+
+  .dropdown {
+    position: absolute; z-index: 50; top: calc(100% + 8px); left: 0; width: 100%; min-width: 256px;
+    border-radius: 16px; border: 1px solid rgba(255,255,255,.1);
+    background: rgba(24,24,27,.95); backdrop-filter: blur(20px);
+    box-shadow: 0 24px 48px rgba(0,0,0,.5); padding: 8px;
+  }
+  .dropdown .search {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+    border-radius: 10px; padding: 8px 12px;
+  }
+  .dropdown .search svg { width: 16px; height: 16px; color: rgba(255,255,255,.4); }
+  .dropdown .search input {
+    width: 100%; background: transparent; border: 0; outline: 0; color: #fff;
+    font-size: 14px; font-family: inherit;
+  }
+  .dropdown .search input::placeholder { color: rgba(255,255,255,.35); }
+  .dropdown .list { max-height: 256px; overflow-y: auto; padding-right: 4px; }
+  .opt {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    border: 0; background: transparent; border-radius: 10px; padding: 8px;
+    cursor: pointer; transition: background .1s; font-family: inherit; text-align: left;
+  }
+  .opt:hover, .opt.active { background: rgba(255,255,255,.06); }
+  .opt .tag {
+    width: 36px; height: 28px; border-radius: 6px; background: rgba(255,255,255,.06);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: rgba(255,255,255,.7); flex-shrink: 0;
+  }
+  .opt .meta { flex: 1; min-width: 0; }
+  .opt .meta b { display: block; font-size: 14px; color: #fff; }
+  .opt .meta span { display: block; font-size: 12px; color: rgba(255,255,255,.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opt > svg { width: 16px; height: 16px; stroke: var(--emerald); }
+  .empty { text-align: center; font-size: 14px; color: rgba(255,255,255,.4); padding: 24px 8px; }
+
+  .swap {
+    margin: 0 auto; width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(52,211,153,.3); background: rgba(52,211,153,.1); color: #6ee7b7;
+    transition: all .15s;
+  }
+  .swap:hover { transform: scale(1.05); background: rgba(52,211,153,.2); }
+  .swap:active { transform: scale(.95); }
+  .swap svg { width: 20px; height: 20px; transition: transform .3s; }
+
+  /* date picker */
+  .date-row { margin-top: 24px; }
+  .date-row .controls { display: flex; align-items: center; gap: 8px; }
+  .dp { position: relative; width: 100%; }
+  .dp-btn {
+    display: flex; align-items: center; gap: 12px; width: 100%; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+    padding: 15px 16px; cursor: pointer; transition: all .15s; font-family: inherit; text-align: left;
+  }
+  .dp-btn:hover { border-color: rgba(255,255,255,.2); }
+  .dp-btn.set { border-color: rgba(167,139,250,.4); }
+  .dp-btn svg { width: 16px; height: 16px; flex-shrink: 0; color: rgba(255,255,255,.4); }
+  .dp-btn.set svg.cal-ico { color: #c4b5fd; }
+  .dp-btn .txt {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-family: inherit;
+    font-size: 14px; font-variant-numeric: tabular-nums; color: #fff; cursor: text;
+  }
+  .dp-btn .txt::placeholder { color: rgba(255,255,255,.35); }
+  .dp-btn.set .txt { font-weight: 500; }
+  .dp-btn:focus-within { border-color: rgba(167,139,250,.6); }
+  .dp-btn .txt.err { color: #fda4af; }
+  .dp-btn .chev { transition: color .15s; }
+  .dp-btn:hover .chev { color: rgba(255,255,255,.7); }
+  .cal {
+    position: absolute; z-index: 50; top: calc(100% + 8px); left: 0; width: 100%; min-width: 288px;
+    border-radius: 16px; border: 1px solid rgba(255,255,255,.1);
+    background: #18181b;
+    box-shadow: 0 24px 48px rgba(0,0,0,.5); padding: 16px;
+  }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-wheels { position: relative; flex: 1; display: flex; justify-content: center; gap: 56px; }
+  .cal-wheels::before {
+    content: ''; position: absolute; left: 8px; right: 8px; top: 32px; height: 32px; pointer-events: none;
+    border-radius: 8px; background: rgba(167,139,250,.12); box-shadow: inset 0 0 0 1px rgba(167,139,250,.25);
+  }
+  .wheel {
+    position: relative; height: 96px; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none;
+    padding: 32px 0; -webkit-mask-image: linear-gradient(transparent, #000 35%, #000 65%, transparent);
+    mask-image: linear-gradient(transparent, #000 35%, #000 65%, transparent);
+  }
+  .wheel::-webkit-scrollbar { display: none; }
+  .wheel.m { width: 110px; }
+  .wheel.y { width: 72px; }
+  .wheel button {
+    display: block; width: 100%; height: 32px; scroll-snap-align: center; border: 0; background: transparent;
+    cursor: pointer; font-family: inherit; font-size: 14px; color: rgba(255,255,255,.45); font-variant-numeric: tabular-nums;
+  }
+  .wheel button.on { color: #fff; font-weight: 600; }
+  .wheel button:disabled { color: rgba(255,255,255,.15); cursor: default; }
+  .cal-nav {
+    border: 0; background: transparent; cursor: pointer; border-radius: 8px; padding: 6px;
+    color: rgba(255,255,255,.6); display: flex; transition: all .15s;
+  }
+  .cal-nav:hover:not(:disabled) { background: rgba(255,255,255,.08); color: #fff; }
+  .cal-nav:disabled { opacity: .25; cursor: default; }
+  .cal-nav svg { width: 16px; height: 16px; }
+  .cal-dows { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 500; color: rgba(255,255,255,.35); margin-bottom: 4px; }
+  .cal-dows .sun { color: rgba(253,164,175,.6); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px 4px; }
+  .cal-day {
+    height: 36px; border: 0; background: transparent; border-radius: 8px; cursor: pointer;
+    font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.7);
+    transition: all .12s; font-family: inherit;
+  }
+  .cal-day:hover:not(:disabled) { background: rgba(167,139,250,.15); color: #fff; }
+  .cal-day.today { box-shadow: inset 0 0 0 1px rgba(196,181,253,.6); }
+  .cal-day.selected {
+    background: linear-gradient(135deg, #a78bfa, #9333ea); color: #fff; font-weight: 700;
+    box-shadow: 0 4px 14px rgba(139,92,246,.3);
+  }
+  .cal-day:disabled { color: rgba(255,255,255,.2); cursor: not-allowed; }
+  .clear-date {
+    flex-shrink: 0; display: flex; align-items: center; gap: 6px; cursor: pointer;
+    border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+    align-self: stretch; padding: 0 14px; font-size: 12px; color: rgba(255,255,255,.6);
+    transition: all .15s; font-family: inherit;
+  }
+  .clear-date:hover { border-color: rgba(255,255,255,.25); color: #fff; }
+  .clear-date svg { width: 14px; height: 14px; }
+  .date-note { margin-top: 6px; font-size: 11px; color: rgba(255,255,255,.35); }
+
+  .result {
+    margin-top: 28px; border-radius: 16px; text-align: center; padding: 24px;
+    border: 1px solid rgba(52,211,153,.2);
+    background: linear-gradient(135deg, rgba(52,211,153,.09), rgba(45,212,191,.04));
+  }
+  .result.hist {
+    border-color: rgba(167,139,250,.2);
+    background: linear-gradient(135deg, rgba(167,139,250,.09), rgba(168,85,247,.04));
+  }
+  .result .eq { font-size: 14px; color: rgba(255,255,255,.55); }
+  .result .big {
+    margin-top: 4px; font-size: clamp(36px, 7vw, 48px); font-weight: 800;
+    letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+    background: linear-gradient(90deg, #a7f3d0, #5eead4);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .result.hist .big { background: linear-gradient(90deg, #ddd6fe, #d8b4fe); -webkit-background-clip: text; background-clip: text; }
+  .result .big .unit { font-size: 24px; font-weight: 700; margin-left: 8px; }
+  .result .rates {
+    margin-top: 12px; display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 4px 16px; font-size: 12px; color: rgba(255,255,255,.5); font-variant-numeric: tabular-nums;
+  }
+  .hist-badge {
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;
+    border-radius: 999px; border: 1px solid rgba(167,139,250,.25); background: rgba(167,139,250,.1);
+    color: #c4b5fd; font-size: 11px; font-weight: 500; padding: 3px 12px;
+  }
+  .copy-btn {
+    margin: 16px auto 0; display: flex; align-items: center; gap: 6px;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.05); color: rgba(255,255,255,.6);
+    padding: 6px 16px; font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: all .15s; font-family: inherit;
+  }
+  .copy-btn:hover { border-color: rgba(255,255,255,.3); color: #fff; }
+  .copy-btn:active { transform: scale(.95); }
+  .copy-btn.done { border-color: rgba(52,211,153,.5); background: rgba(52,211,153,.15); color: #6ee7b7; }
+  .copy-btn svg { width: 14px; height: 14px; }
+  .loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px 0; font-size: 14px; color: rgba(255,255,255,.45); }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .meta-row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; font-size: 12px; color: rgba(255,255,255,.4); }
+  .refresh {
+    display: flex; align-items: center; gap: 6px; border: 0; background: transparent;
+    color: inherit; font-size: 12px; cursor: pointer; border-radius: 8px; padding: 4px 8px;
+    transition: all .15s; font-family: inherit;
+  }
+  .refresh:hover { background: rgba(255,255,255,.06); color: rgba(255,255,255,.7); }
+  .refresh:disabled { opacity: .4; cursor: default; }
+  .refresh svg { width: 14px; height: 14px; }
+
+  footer {
+    margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.06);
+    text-align: center; font-size: 12px; line-height: 1.7; color: rgba(255,255,255,.35);
+  }
+  footer a { color: rgba(255,255,255,.55); text-decoration: underline; text-decoration-color: rgba(255,255,255,.2); text-underline-offset: 2px; }
+  footer a:hover { color: #6ee7b7; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .fade-up { animation: fadeUp .35s ease; }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="grid-bg"></div>
+
+<div class="wrap">
+  <header>
+    <div class="logo">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7l-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg></div>
+      <span>Rate<span class="accent">XI</span></span>
+    </div>
+    <div id="badge" class="badge live"><span class="dot"></span><span id="badge-text">LIVE</span></div>
+  </header>
+
+  <div class="hero">
+    <div class="pill">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      อัตราแลกเปลี่ยนกลาง (mid-market) · 160+ สกุลเงิน
+    </div>
+    <h1>แปลงสกุลเงิน<span class="grad"> แบบเรียลไทม์</span></h1>
+  </div>
+
+  <div class="card">
+    <div id="warn" class="warn hidden">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4"/><path d="M12 16h.01"/><circle cx="12" cy="12" r="10"/></svg>
+      เครือข่ายมีปัญหา — แสดงอัตราที่บันทึกไว้หรืออัตราโดยประมาณ
+    </div>
+
+    <label>จำนวนเงิน</label>
+    <div class="amount-box">
+      <span class="sym" id="from-sym">$</span>
+      <input id="amount" inputmode="decimal" placeholder="0.00" value="1,000" />
+      <span class="code" id="from-code">USD</span>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>จาก</label>
+        <div class="sel" id="sel-from"></div>
+      </div>
+      <button class="swap" id="swap" aria-label="สลับสกุลเงิน" title="สลับสกุลเงิน">
+        <svg id="swap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
+      </button>
+      <div>
+        <label>เป็น</label>
+        <div class="sel" id="sel-to"></div>
+      </div>
+    </div>
+
+    <div class="date-row">
+      <label>ดูอัตราย้อนหลัง</label>
+      <div class="controls">
+        <div class="dp" id="dp"></div>
+        <button type="button" class="clear-date hidden" id="clear-date">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          อัตราล่าสุด
+        </button>
+      </div>
+      <p class="date-note hidden" id="date-note"></p>
+    </div>
+
+    <div class="result" id="result">
+      <div class="loading">
+        <svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        กำลังโหลดอัตราแลกเปลี่ยน…
+      </div>
+    </div>
+
+    <div class="meta-row">
+      <span id="updated">อัปเดตล่าสุด: —</span>
+      <button class="refresh" id="refresh">
+        <svg id="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        รีเฟรช
+      </button>
+    </div>
+  </div>
+
+  <footer>
+    <p>ข้อมูลจาก <a href="https://www.exchangerate-api.com" target="_blank" rel="noreferrer">ExchangeRate-API</a> · อัตรากลางตลาด (mid-market) อัปเดตวันละครั้งบนแผนฟรี</p>
+    <p>อัตราซื้อขายจริงของธนาคาร/ตู้แลกเงินจะต่างจากนี้ตามสเปรดของแต่ละผู้ให้บริการ</p>
+  </footer>
+</div>
+
+<script>
+'use strict'
+
+// ---------- Data ----------
+const RAW = [
+  ['THB','Thai Baht','฿'],['USD','US Dollar','$'],['EUR','Euro','€'],
+  ['JPY','Japanese Yen','¥'],['GBP','British Pound','£'],['CNY','Chinese Yuan','¥'],
+  ['SGD','Singapore Dollar','S$'],['KRW','South Korean Won','₩'],['HKD','Hong Kong Dollar','HK$'],
+  ['AUD','Australian Dollar','A$'],['CHF','Swiss Franc','Fr'],['CAD','Canadian Dollar','C$'],
+  ['MYR','Malaysian Ringgit','RM'],['TWD','Taiwan Dollar','NT$'],['VND','Vietnamese Dong','₫'],
+  ['IDR','Indonesian Rupiah','Rp'],['INR','Indian Rupee','₹'],['PHP','Philippine Peso','₱'],
+  ['NZD','New Zealand Dollar','NZ$'],['AED','UAE Dirham','د.إ'],['SAR','Saudi Riyal','﷼'],
+  ['SEK','Swedish Krona','kr'],['NOK','Norwegian Krone','kr'],['DKK','Danish Krone','kr'],
+  ['PLN','Polish Zloty','zł'],['CZK','Czech Koruna','Kč'],['HUF','Hungarian Forint','Ft'],
+  ['TRY','Turkish Lira','₺'],['ZAR','South African Rand','R'],['BRL','Brazilian Real','R$'],
+  ['MXN','Mexican Peso','MX$'],['RUB','Russian Ruble','₽'],['LAK','Lao Kip','₭'],
+  ['KHR','Cambodian Riel','៛'],['MMK','Myanmar Kyat','K'],
+]
+const CURRENCIES = RAW.map(([code, name, symbol]) => ({ code, name, symbol }))
+const FALLBACK_USD = { USD:1, THB:32.75, EUR:0.863, JPY:151.9, GBP:0.752, CNY:7.12, SGD:1.301, KRW:1430, HKD:7.78, AUD:1.538, CHF:0.795, CAD:1.403, MYR:4.22 }
+const cur = (code) => CURRENCIES.find(c => c.code === code) || { code, name: code, symbol: code }
+
+const SVG = {
+  chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  chevronL: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+  chevronR: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="8" width="10" height="12" rx="2"/><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>',
+  calendar: '<svg class="cal-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>',
+}
+
+// ---------- Formatting ----------
+const fmtRate = n =>
+  !isFinite(n) ? '—'
+  : n >= 10000 ? n.toLocaleString('en-US', { maximumFractionDigits: 0 })
+  : n >= 100 ? n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  : n >= 1 ? n.toLocaleString('en-US', { maximumFractionDigits: 4 })
+  : n.toLocaleString('en-US', { maximumFractionDigits: 6 })
+const fmtAmount = n =>
+  !isFinite(n) ? '—'
+  : n.toLocaleString('en-US', { maximumFractionDigits: n >= 1000 ? 2 : 4 })
+const parseAmount = raw => parseFloat(String(raw).replace(/[^0-9.]/g, '')) || 0
+
+function timeAgo(utc) {
+  const t = new Date(utc).getTime()
+  if (!utc || isNaN(t)) return '—'
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000))
+  if (m < 1) return 'เมื่อสักครู่'
+  if (m < 60) return m + ' นาทีที่แล้ว'
+  const h = Math.floor(m / 60)
+  return h < 24 ? h + ' ชั่วโมงที่แล้ว' : Math.floor(h / 24) + ' วันที่แล้ว'
+}
+
+const todayLocal = () => {
+  const d = new Date()
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+}
+const fmtDateTH = (iso) =>
+  iso ? new Date(iso + 'T00:00:00').toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+
+// ---------- State ----------
+const state = {
+  from: 'USD', to: 'THB', rates: null, updated: '', live: true, loading: true, swaps: 0,
+  histDate: '', hist: { rate: null, actualDate: '', source: '', loading: false, error: false },
+  calOpen: false, calView: todayLocal().slice(0, 7),
+}
+const $ = (id) => document.getElementById(id)
+
+// ---------- Latest rates (ExchangeRate-API, hourly cache) ----------
+async function loadRates(force) {
+  const base = state.from
+  const key = 'ratexi:' + base
+  let cached = null
+  try { cached = JSON.parse(localStorage.getItem(key)) } catch {}
+  if (cached) {
+    state.rates = cached.data.rates
+    state.updated = cached.data.updated
+    state.live = cached.data.live
+    state.loading = false
+    render()
+  }
+  if (!force && cached && Date.now() - cached.at < 3600000) return
+  state.loading = true
+  render()
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/' + base)
+    const json = await res.json()
+    if (json.result !== 'success') throw new Error()
+    const fresh = { rates: json.rates, updated: json.time_last_update_utc, live: true }
+    localStorage.setItem(key, JSON.stringify({ at: Date.now(), data: fresh }))
+    state.rates = fresh.rates
+    state.updated = fresh.updated
+    state.live = true
+    $('warn').classList.add('hidden')
+  } catch {
+    if (cached) {
+      state.rates = cached.data.rates
+      state.updated = cached.data.updated
+    } else {
+      const fb = FALLBACK_USD[base]
+      state.rates = fb
+        ? Object.fromEntries(Object.entries(FALLBACK_USD).map(([c, r]) => [c, r / fb]))
+        : {}
+      state.updated = ''
+    }
+    state.live = false
+    $('warn').classList.remove('hidden')
+  } finally {
+    state.loading = false
+    render()
+  }
+}
+
+// ---------- Historical rate (Frankfurter/ECB primary, currency-api CDN fallback) ----------
+async function loadHist() {
+  if (!state.histDate) {
+    state.hist = { rate: null, actualDate: '', source: '', loading: false, error: false }
+    render()
+    return
+  }
+  const { from, to, histDate } = state
+  state.hist = { rate: null, actualDate: '', source: '', loading: true, error: false }
+  render()
+  const stale = () => state.histDate !== histDate || state.from !== from || state.to !== to
+  try {
+    const res = await fetch(`https://api.frankfurter.dev/v1/${histDate}?base=${from}&symbols=${to}`)
+    if (!res.ok) throw new Error()
+    const json = await res.json()
+    const r = json.rates && json.rates[to]
+    if (r == null) throw new Error()
+    if (!stale()) { state.hist = { rate: r, actualDate: json.date, source: 'ECB', loading: false, error: false }; render() }
+  } catch {
+    try {
+      const res = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${histDate}/v1/currencies/${from.toLowerCase()}.json`)
+      if (!res.ok) throw new Error()
+      const json = await res.json()
+      const base = json[from.toLowerCase()]
+      const r = base && base[to.toLowerCase()]
+      if (r == null) throw new Error()
+      if (!stale()) { state.hist = { rate: r, actualDate: json.date || histDate, source: 'currency-api', loading: false, error: false }; render() }
+    } catch {
+      if (!stale()) { state.hist = { rate: null, actualDate: '', source: '', loading: false, error: true }; render() }
+    }
+  }
+}
+
+// ---------- Currency dropdown ----------
+function buildSelect(el, accent, get, set) {
+  function renderBtn() {
+    const c = cur(get())
+    el.innerHTML =
+      '<button type="button" class="sel-btn">' +
+        '<span class="avatar ' + accent + '">' + c.code.slice(0, 2) + '</span>' +
+        '<span class="meta"><b>' + c.code + '</b><span>' + c.name + '</span></span>' +
+        SVG.chevron +
+      '</button>'
+    el.querySelector('.sel-btn').addEventListener('click', (e) => {
+      e.stopPropagation()
+      state.calOpen = false
+      toggle()
+    })
+  }
+
+  function toggle() {
+    const existing = el.querySelector('.dropdown')
+    if (existing) { existing.remove(); return }
+    closeAllDropdowns()
+    const dd = document.createElement('div')
+    dd.className = 'dropdown'
+    dd.innerHTML =
+      '<div class="search">' + SVG.search +
+        '<input placeholder="ค้นหาสกุลเงิน…" />' +
+      '</div><div class="list"></div>'
+    el.appendChild(dd)
+    const input = dd.querySelector('input')
+    const list = dd.querySelector('.list')
+    input.focus()
+
+    function renderList(q) {
+      const items = q
+        ? CURRENCIES.filter(c => (c.code + ' ' + c.name).toLowerCase().includes(q.toLowerCase()))
+        : CURRENCIES
+      list.innerHTML = items.length === 0
+        ? '<p class="empty">ไม่พบสกุลเงิน</p>'
+        : items.map(c =>
+            '<button type="button" class="opt' + (c.code === get() ? ' active' : '') + '" data-code="' + c.code + '">' +
+              '<span class="tag">' + c.code + '</span>' +
+              '<span class="meta"><b>' + c.code + '</b><span>' + c.name + '</span></span>' +
+              (c.code === get() ? SVG.check : '') +
+            '</button>'
+          ).join('')
+      list.querySelectorAll('.opt').forEach(btn =>
+        btn.addEventListener('click', () => {
+          set(btn.dataset.code)
+          dd.remove()
+          renderBtn()
+        })
+      )
+    }
+    renderList('')
+    input.addEventListener('input', () => renderList(input.value.trim()))
+    dd.addEventListener('click', (e) => e.stopPropagation())
+  }
+
+  renderBtn()
+  return renderBtn
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.dropdown').forEach(d => d.remove())
+}
+document.addEventListener('click', () => {
+  closeAllDropdowns()
+  if (state.calOpen) { state.calOpen = false; renderCalendar() }
+})
+
+// ---------- Custom calendar ----------
+const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']
+const TH_DAYS = ['อา','จ','อ','พ','พฤ','ศ','ส']
+const MIN_VIEW = '1999-01'
+
+function setHistDate(iso) {
+  state.histDate = iso
+  state.calOpen = false
+  renderCalendar()
+  loadHist()
+}
+
+function renderCalendar() {
+  const dp = $('dp')
+  const today = todayLocal()
+  const set = !!state.histDate
+  let html =
+    '<div class="dp-btn' + (set ? ' set' : '') + '" id="dp-btn">' +
+      SVG.calendar +
+      '<input class="txt" id="dp-input" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="วว/ดด/ปปปป (ค.ศ.)" value="' + fmtDateInput(state.histDate) + '">' +
+      '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:rgba(255,255,255,.4)"><path d="m6 9 6 6 6-6"/></svg>' +
+    '</div>'
+
+  if (state.calOpen) {
+    const [y, m] = state.calView.split('-').map(Number)
+    const firstDow = new Date(y, m - 1, 1).getDay()
+    const daysInMonth = new Date(y, m, 0).getDate()
+    const canPrev = state.calView > MIN_VIEW
+    const maxView = today.slice(0, 7)
+    const canNext = state.calView < maxView
+    const years = []
+    for (let yy = Number(MIN_VIEW.slice(0, 4)); yy <= Number(today.slice(0, 4)); yy++) years.push(yy)
+
+    let grid = ''
+    for (let i = 0; i < firstDow; i++) grid += '<span></span>'
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = state.calView + '-' + String(d).padStart(2, '0')
+      const dis = iso > today || iso < '1999-01-04'
+      const cls = 'cal-day' +
+        (iso === state.histDate ? ' selected' : '') +
+        (iso === today ? ' today' : '')
+      grid += '<button type="button" class="' + cls + '" data-iso="' + iso + '"' + (dis ? ' disabled' : '') + '>' + d + '</button>'
+    }
+
+    html +=
+      '<div class="cal" id="cal">' +
+        '<div class="cal-head">' +
+          '<button type="button" class="cal-nav" id="cal-prev"' + (canPrev ? '' : ' disabled') + '>' + SVG.chevronL + '</button>' +
+          '<div class="cal-wheels">' +
+            '<div class="wheel m" id="wheel-m">' + TH_MONTHS.map((n, i) => {
+              const v = y + '-' + String(i + 1).padStart(2, '0')
+              return '<button type="button" data-i="' + i + '"' + (i === m - 1 ? ' class="on"' : '') + (v > maxView ? ' disabled' : '') + '>' + n + '</button>'
+            }).join('') + '</div>' +
+            '<div class="wheel y" id="wheel-y">' + years.map((yy, i) =>
+              '<button type="button" data-i="' + i + '"' + (yy === y ? ' class="on"' : '') + '>' + yy + '</button>'
+            ).join('') + '</div>' +
+          '</div>' +
+          '<button type="button" class="cal-nav" id="cal-next"' + (canNext ? '' : ' disabled') + '>' + SVG.chevronR + '</button>' +
+        '</div>' +
+        '<div class="cal-dows">' +
+          TH_DAYS.map((d, i) => '<span class="' + (i === 0 ? 'sun' : '') + '">' + d + '</span>').join('') +
+        '</div>' +
+        '<div class="cal-grid">' + grid + '</div>' +
+      '</div>'
+  }
+
+  dp.innerHTML = html
+
+  const input = dp.querySelector('#dp-input')
+  input.addEventListener('input', () => {
+    if (input.classList.contains('err')) { input.classList.remove('err'); $('date-note').classList.add('hidden') }
+    const d = input.value.replace(/\D/g, '').slice(0, 8)
+    input.value = [d.slice(0, 2), d.slice(2, 4), d.slice(4)].filter(Boolean).join('/')
+  })
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur() })
+  input.addEventListener('blur', () => commitTypedDate(input))
+
+  dp.querySelector('#dp-btn').addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (e.target === input) return
+    closeAllDropdowns()
+    state.calOpen = !state.calOpen
+    if (state.calOpen) state.calView = (state.histDate || todayLocal()).slice(0, 7)
+    renderCalendar()
+  })
+
+  const cal = dp.querySelector('#cal')
+  if (cal) {
+    cal.addEventListener('click', (e) => e.stopPropagation())
+    cal.querySelectorAll('.cal-day').forEach(btn =>
+      btn.addEventListener('click', () => setHistDate(btn.dataset.iso))
+    )
+    const prev = cal.querySelector('#cal-prev')
+    const next = cal.querySelector('#cal-next')
+    if (prev) prev.addEventListener('click', () => shiftCal(-1))
+    if (next) next.addEventListener('click', () => shiftCal(1))
+    const [y, m] = state.calView.split('-').map(Number)
+    bindWheel(cal.querySelector('#wheel-m'), m - 1, i => setCalView(y, i + 1))
+    bindWheel(cal.querySelector('#wheel-y'), y - Number(MIN_VIEW.slice(0, 4)), i => setCalView(Number(MIN_VIEW.slice(0, 4)) + i, m))
+  }
+}
+
+// Typed date: dd/mm/yyyy in ค.ศ.; empty clears
+function fmtDateInput(iso) {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-')
+  return d + '/' + m + '/' + y
+}
+
+function commitTypedDate(input) {
+  const text = input.value.trim()
+  if (text === fmtDateInput(state.histDate)) return
+  if (!text) return setHistDate('')
+  const [d, m, y] = text.split('/').map(Number)
+  const dt = new Date(y, m - 1, d)
+  const iso = dt.getFullYear() + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0')
+  const valid = String(y).length === 4 && dt.getMonth() === m - 1 && dt.getDate() === d &&
+    iso >= '1999-01-04' && iso <= todayLocal()
+  if (!valid) {
+    input.classList.add('err')
+    $('date-note').textContent = 'วันที่ไม่ถูกต้อง — พิมพ์แบบ วว/ดด/ปปปป ตั้งแต่ 04/01/1999 ถึงวันนี้'
+    $('date-note').classList.remove('hidden')
+    return
+  }
+  setHistDate(iso)
+}
+
+// Scroll wheel: snaps to the middle row, commits the value once scrolling stops
+const WHEEL_ROW = 32
+const WHEEL_NOTCH = 50 // wheel deltaY that moves one row (a mouse notch is ~100, trackpads send small steps)
+function bindWheel(wheel, index, onPick) {
+  wheel.scrollTop = index * WHEEL_ROW
+  let timer, target = null, acc = 0
+  const last = wheel.querySelectorAll('button').length - 1
+  wheel.addEventListener('scroll', () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      target = null
+      const i = Math.round(wheel.scrollTop / WHEEL_ROW)
+      if (i !== index) onPick(i)
+    }, 120)
+  })
+  // Mouse wheel: one notch = one row (native scrolling jumps several rows per notch)
+  wheel.addEventListener('wheel', (e) => {
+    e.preventDefault()
+    acc += e.deltaY
+    if (Math.abs(acc) < WHEEL_NOTCH) return
+    const from = target ?? Math.round(wheel.scrollTop / WHEEL_ROW)
+    target = Math.max(0, Math.min(last, from + Math.sign(acc)))
+    acc = 0
+    wheel.scrollTo({ top: target * WHEEL_ROW, behavior: 'smooth' })
+  }, { passive: false })
+  wheel.querySelectorAll('button').forEach(btn =>
+    btn.addEventListener('click', () => wheel.scrollTo({ top: btn.dataset.i * WHEEL_ROW, behavior: 'smooth' }))
+  )
+}
+
+// Clamp to 1999-01 … current month so the wheels never land on a month without data
+function setCalView(y, m) {
+  let v = y + '-' + String(m).padStart(2, '0')
+  const max = todayLocal().slice(0, 7)
+  if (v > max) v = max
+  if (v < MIN_VIEW) v = MIN_VIEW
+  state.calView = v
+  renderCalendar()
+}
+
+function shiftCal(dir) {
+  const [y, m] = state.calView.split('-').map(Number)
+  const nm = m + dir
+  setCalView(nm > 12 ? y + 1 : nm < 1 ? y - 1 : y, ((nm - 1 + 12) % 12) + 1)
+}
+
+// ---------- Render ----------
+let renderFromBtn, renderToBtn
+
+function render() {
+  const { from, to, rates } = state
+
+  // badge
+  const badge = $('badge')
+  const mode = state.histDate ? 'hist' : state.live ? 'live' : 'offline'
+  badge.className = 'badge ' + mode
+  $('badge-text').textContent = mode === 'hist' ? 'HISTORY' : mode === 'live' ? 'LIVE' : 'OFFLINE DATA'
+
+  // amount box labels
+  $('from-sym').textContent = cur(from).symbol
+  $('from-code').textContent = from
+
+  // result
+  const amount = parseAmount($('amount').value)
+  const rate = state.histDate ? state.hist.rate : (rates && rates[to])
+  const result = $('result')
+  result.classList.toggle('hist', !!state.histDate)
+  if (state.histDate && state.hist.error) {
+    result.innerHTML =
+      '<div class="loading" style="color:rgba(253,230,138,.8)">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4"/><path d="M12 16h.01"/><circle cx="12" cy="12" r="10"/></svg>' +
+        'ไม่พบอัตราของวันที่ ' + fmtDateTH(state.histDate) + ' สำหรับคู่สกุลเงินนี้</div>'
+  } else if (rate != null && !(state.histDate && state.hist.loading)) {
+    const converted = amount * rate
+    result.innerHTML =
+      '<div class="fade-up">' +
+        (state.histDate
+          ? '<p class="hist-badge">อัตราย้อนหลัง · ' + fmtDateTH(state.hist.actualDate) +
+            ' · ที่มา: ' + (state.hist.source === 'ECB' ? 'ECB (ธนาคารกลางยุโรป)' : 'currency-api') + '</p>'
+          : '') +
+        '<p class="eq">' + fmtAmount(amount) + ' ' + from + ' =</p>' +
+        '<p class="big">' + fmtAmount(converted) + '<span class="unit">' + to + '</span></p>' +
+        '<div class="rates">' +
+          '<span>1 ' + from + ' = ' + fmtRate(rate) + ' ' + to + '</span>' +
+          '<span>1 ' + to + ' = ' + fmtRate(1 / rate) + ' ' + from + '</span>' +
+        '</div>' +
+        '<button type="button" class="copy-btn" id="copy-btn">' + SVG.copy + 'คัดลอกยอดเงิน</button>' +
+      '</div>'
+    $('copy-btn').addEventListener('click', async () => {
+      const text = fmtAmount(converted).replace(/,/g, '')
+      try {
+        await navigator.clipboard.writeText(text)
+      } catch {
+        const el = document.createElement('textarea')
+        el.value = text
+        document.body.appendChild(el)
+        el.select()
+        document.execCommand('copy')
+        el.remove()
+      }
+      const btn = $('copy-btn')
+      btn.classList.add('done')
+      btn.innerHTML = SVG.check + 'คัดลอกแล้ว'
+      setTimeout(() => {
+        if ($('copy-btn')) {
+          btn.classList.remove('done')
+          btn.innerHTML = SVG.copy + 'คัดลอกยอดเงิน'
+        }
+      }, 1500)
+    })
+  } else {
+    result.innerHTML =
+      '<div class="loading"><svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>กำลังโหลดอัตราแลกเปลี่ยน…</div>'
+  }
+
+  // meta
+  $('updated').textContent = state.histDate
+    ? 'อัตราของวันที่ ' + fmtDateTH(state.hist.actualDate || state.histDate)
+    : 'อัปเดตล่าสุด: ' + timeAgo(state.updated)
+  $('refresh').disabled = state.loading
+  $('refresh-icon').classList.toggle('spin', state.loading)
+
+  // date picker ui
+  $('clear-date').classList.toggle('hidden', !state.histDate)
+  const shifted = state.histDate && state.hist.actualDate && state.hist.actualDate !== state.histDate
+  $('date-note').classList.toggle('hidden', !shifted)
+  if (shifted) $('date-note').textContent = 'วันที่เลือกไม่มีการประกาศอัตรา — แสดงของวันที่ ' + fmtDateTH(state.hist.actualDate) + ' แทน'
+}
+
+// ---------- Wiring ----------
+$('amount').addEventListener('input', render)
+
+$('swap').addEventListener('click', () => {
+  ;[state.from, state.to] = [state.to, state.from]
+  state.swaps++
+  $('swap-icon').style.transform = 'rotate(' + state.swaps * 180 + 'deg)'
+  renderFromBtn()
+  renderToBtn()
+  render()
+  loadRates(false)
+  if (state.histDate) loadHist()
+})
+$('refresh').addEventListener('click', () => loadRates(true))
+$('clear-date').addEventListener('click', () => setHistDate(''))
+
+function setFrom(code) {
+  if (code === state.from) return
+  state.from = code
+  render()
+  loadRates(false)
+  if (state.histDate) loadHist()
+}
+function setTo(code) {
+  state.to = code
+  render()
+  if (state.histDate) loadHist()
+}
+
+renderFromBtn = buildSelect($('sel-from'), 'emerald', () => state.from, setFrom)
+renderToBtn = buildSelect($('sel-to'), 'sky', () => state.to, setTo)
+renderCalendar()
+
+loadRates(false)
+</script>
+</body>
+</html>
